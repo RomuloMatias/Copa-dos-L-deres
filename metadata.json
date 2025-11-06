@@ -1,0 +1,5 @@
+{
+  "name": "World Cup Gamification Namer",
+  "description": "Generate creative, World Cup-themed names for management tasks, badges, and ranking levels to gamify your leadership system using the Gemini API.",
+  "requestFramePermissions": []
+}

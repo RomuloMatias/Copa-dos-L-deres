@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: "World Cup Gamification API"
+  description: |-
+    API for the World Cup themed gamification system for leaders.
+    This system allows leaders to complete tasks, give and receive kudos,
+    log feedback, and see their ranking on a seasonal leaderboard.
+  version: "1.0.0"
+  contact:
+    email: "api-support@example.com"
+servers:
+  - url: "https://api.example.com/v1"
+    description: "Production Server"
+tags:
+  - name: "Ranking"
+    description: "Endpoints for retrieving leader rankings and leaderboards."
+  - name: "Actions"
+    description: "Endpoints for leader actions like completing tasks, giving kudos, and providing feedback."
+
+# ------------------------------------------------------------
+#  Paths
+# ------------------------------------------------------------
+paths:
+  /ranking/{season}:
+    get:
+      tags:
+        - "Ranking"
+      summary: "Get Leaderboard by Season"
+      description: "Retrieves the ranked list of leaders based on their points for a specific season."
+      operationId: "getRankingBySeason"
+      parameters:
+        - name: "season"
+          in: "path"
+          required: true
+          description: "The season identifier (e.g., '2024-H2')."
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "A list of leaders ranked by their score."
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/LeaderRanking"
+        "404":
+          description: "The specified season was not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /task/{id}/complete:
+    post:
+      tags:
+        - "Actions"
+      summary: "Complete a Task"
+      description: "Marks a specific task as completed for the authenticated leader. This action is idempotent for a given leader and task."
+      operationId: "completeTask"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          description: "The unique identifier of the task to complete."
+          schema:
+            type: "string"
+            format: "uuid"
+      requestBody:
+        description: "Optional notes or evidence for the task completion."
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCompletionRequest"
+      responses:
+        "201":
+          description: "Task successfully marked as complete."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCompletion"
+        "400":
+          description: "Invalid request, for example, if the task is already completed."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "Authentication information is missing or invalid."
+        "404":
+          description: "A task with the specified ID was not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /kudos:
+    post:
+      tags:
+        - "Actions"
+      summary: "Send Kudos"
+      description: "Allows the authenticated leader to send kudos (peer-to-peer recognition) to another leader."
+      operationId: "sendKudos"
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: "The details of the kudos to be sent."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KudosRequest"
+      responses:
+        "201":
+          description: "Kudos successfully sent."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kudos"
+        "400":
+          description: "Invalid request, for example, sending kudos to oneself."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "Authentication information is missing or invalid."
+        "404":
+          description: "The receiving leader was not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /feedback:
+    post:
+      tags:
+        - "Actions"
+      summary: "Log a Feedback Pulse"
+      description: "Logs an instance of quick feedback given by the authenticated leader to a team member."
+      operationId: "logFeedback"
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: "The details of the feedback pulse."
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackPulseRequest"
+      responses:
+        "201":
+          description: "Feedback pulse successfully logged."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackPulse"
+        "400":
+          description: "Invalid data provided for the feedback."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "Authentication information is missing or invalid."
+
+# ------------------------------------------------------------
+#  Reusable Components
+# ------------------------------------------------------------
+components:
+  securitySchemes:
+    BearerAuth:
+      type: "http"
+      scheme: "bearer"
+      bearerFormat: "JWT"
+      description: "JWT token for authenticating the leader."
+  schemas:
+    # --- Model Schemas ---
+    Leader:
+      type: "object"
+      properties:
+        leader_id:
+          type: "string"
+          format: "uuid"
+          readOnly: true
+        name:
+          type: "string"
+        email:
+          type: "string"
+          format: "email"
+        team_name:
+          type: "string"
+        ranking_level:
+          type: "string"
+          description: "Current gamification ranking level."
+        created_at:
+          type: "string"
+          format: "date-time"
+          readOnly: true
+    TaskCompletion:
+      type: "object"
+      properties:
+        completion_id:
+          type: "string"
+          format: "uuid"
+          readOnly: true
+        leader_id:
+          type: "string"
+          format: "uuid"
+        task_id:
+          type: "string"
+          format: "uuid"
+        completed_at:
+          type: "string"
+          format: "date-time"
+          readOnly: true
+        notes:
+          type: "string"
+          nullable: true
+    Kudos:
+      type: "object"
+      properties:
+        kudos_id:
+          type: "string"
+          format: "uuid"
+          readOnly: true
+        sender_leader_id:
+          type: "string"
+          format: "uuid"
+        receiver_leader_id:
+          type: "string"
+          format: "uuid"
+        message:
+          type: "string"
+        badge_awarded:
+          type: "string"
+          nullable: true
+          description: "Conceptual badge associated with the kudos."
+        created_at:
+          type: "string"
+          format: "date-time"
+          readOnly: true
+    FeedbackPulse:
+      type: "object"
+      properties:
+        feedback_id:
+          type: "string"
+          format: "uuid"
+          readOnly: true
+        giver_leader_id:
+          type: "string"
+          format: "uuid"
+        receiver_name:
+          type: "string"
+        receiver_email:
+          type: "string"
+          format: "email"
+          nullable: true
+        feedback_content:
+          type: "string"
+        rating:
+          type: "integer"
+          format: "int32"
+          minimum: 1
+          maximum: 5
+          nullable: true
+        created_at:
+          type: "string"
+          format: "date-time"
+          readOnly: true
+
+    # --- Request Body Schemas ---
+    TaskCompletionRequest:
+      type: "object"
+      properties:
+        notes:
+          type: "string"
+          description: "Optional notes or evidence for the completion."
+          example: "Completed the quarterly review for the entire team."
+    KudosRequest:
+      type: "object"
+      required:
+        - "receiver_leader_id"
+        - "message"
+      properties:
+        receiver_leader_id:
+          type: "string"
+          format: "uuid"
+          description: "The UUID of the leader receiving the kudos."
+        message:
+          type: "string"
+          description: "The recognition message."
+          example: "Great job on the presentation today, your leadership really shone through!"
+        badge_awarded:
+          type: "string"
+          description: "Optional conceptual badge to associate with the kudos."
+          example: "Fair Play"
+    FeedbackPulseRequest:
+      type: "object"
+      required:
+        - "receiver_name"
+        - "feedback_content"
+      properties:
+        receiver_name:
+          type: "string"
+          description: "Name of the team member receiving feedback."
+          example: "Alex Doe"
+        feedback_content:
+          type: "string"
+          description: "The content of the feedback provided."
+          example: "Your work on the client proposal was excellent. Keep up the great initiative."
+        receiver_email:
+          type: "string"
+          format: "email"
+          description: "Optional email of the receiver."
+        rating:
+          type: "integer"
+          format: "int32"
+          description: "An optional 1-5 rating for the feedback session."
+          minimum: 1
+          maximum: 5
+
+    # --- Response Schemas ---
+    LeaderRanking:
+      type: "object"
+      properties:
+        rank:
+          type: "integer"
+          format: "int32"
+        leader:
+          $ref: "#/components/schemas/Leader"
+        score:
+          type: "integer"
+          format: "int32"
+          description: "Total points for the season."
+
+    ApiError:
+      type: "object"
+      properties:
+        code:
+          type: "string"
+          description: "An internal error code."
+        message:
+          type: "string"
+          description: "A human-readable error message."
